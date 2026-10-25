@@ -105,6 +105,62 @@ Defensive framing:
 - `docs.oscilar.com` is password-protected and there's no self-service signup —
   this was all from the public SDK + public URL-scan indexes.
 
+## See it live — screenshot of the full payload
+
+![Oscilar — readable pre-encryption payload + ChaCha20 key + tamper diff (full page)](screenshots/oscillar-full-payload.png)
+
+*Full-page capture of `scripts/oscilar-visual.mjs` (visible-browser demo): the complete readable payload (48 modules, every field and list item) captured pre-encryption from the SDK's own object, with the ChaCha20 key panel, client-side tamper diff, and sandbox-oracle section below. Full page is ~23,000px tall (includes the 419-item font list).*
+
+## What each module means
+
+| Module | Collects |
+|---|---|
+| **Envelope** | |
+| `transactionID` / `tabID` / `sessionID` / `deviceID` / `version` | Per-session IDs + SDK version (`8.2.2`) |
+| **Identity & time** | |
+| `JSTime` | timezone (offset+string), `ts`, `timeString`, `computedTime`, `timeOnPage`, `timeSincePageLoad`, `timeOrigin` |
+| `JSLocation` | href/string, documentURI/URL/baseURI, performance/navigation/entries/anchor URLs |
+| `JSUserJourney` | pageVisits / focusEvents / visibilityStates with per-page path, title, entry/exit, timeSpent |
+| `JSRealm`, `JSRuntimeDomain` | realm detection; devtools preview-getter + `debuggerActive` (debugger attach probe) |
+| **Device surface** | |
+| `JSScreen` | width/height, screen/avail, colorDepth, DPR, outerWidth/Height, `visualViewportScale`, isExtended |
+| `JSUserAgent` | full UA + `app*`/`platform`/`vendor` flags + `uaData` (brands, platform, bitness, wow64, fullVersionList) + `webdriver` ⚠️ + `isBrave` |
+| `JSFonts` / `JSExtendedFonts` | 419 + 111 font-availability checks |
+| `JSFontMetrics` | serif/sans/mono/cursor-width metrics hashes |
+| `JSCanvasHash` | canvas `stringHash` + `dataURLSubstr` |
+| `JSWebGL` | vendor/renderer, extensions, all `max*` limits, `unmaskedRenderer/Vendor`, `enhancedRenderHash`, `shaderPrecisionHash` |
+| `JSWebGPU` | adapter info (headless: `error=no_adapter`) |
+| `JSAudio` | AudioContext/oscillator/analyser/buffer hashes + supported codecs |
+| `JSEmoji` | 15 emoji-rendering hashes (OS icon-set fingerprint: melting face, fox, family, flags…) |
+| `JSMathFingerprint` | math hash + 12/28 result strings + nanBehavior + **wasm-vs-JS** engine check |
+| `JSClientRects` | rect/text/emoji/svg/multi-line hashes |
+| `JSMediaCodecs` | video/audio codec support hashes |
+| `JSDRM` | Widevine/clearkey support, robustness, hardware-secure flag |
+| `JSBrowserPlugins` | plugins count + names + mimeTypes |
+| `JSBattery` | charging state, level |
+| **Behavioral** | |
+| `JSKeyboard` / `JSMouse` / `JSTouch` | event streams: trust, timing, coalesced/future-stamped events, moves/distance/direction, pointer pressure/tilt/twist |
+| `JSClipboard` | clipboard-event logs |
+| `JSHardwareConcurrency` | worker-timing CPU-core estimation |
+| **Bot / tamper detection** | |
+| `JSPlaywright` / `JSSeleniumProperties` | playwright / selenium global+document property probes ⚠️ |
+| `JSIncognito` | serviceWorker, webkitTemporaryStorage, indexedDB, **opfs incognito detection** |
+| `JSConsole` | devtools console open/props hash/`cdpDetected` |
+| `JSAdblockDetector` | ad-block DOM blockers + network-blocked URL probes |
+| `JSBrowserExtensions` | extension detection: global vars, DOM artifacts, CSS injections, overlay flags |
+| `JSWebLocks` | Web Locks API probe (automation correlation) |
+| `JSWebRTC` | **`publicIP`** + candidateType (`srflx`) via STUN |
+| **Environment / misc** | |
+| `JSCSSMediaQueries` | prefers-* / color-gamut / pointer / hover / contrast |
+| `JSSpeechVoices` | speech-synthesis voice count + hashes |
+| `JSBrowserFeatures` / `JSBrowserFeaturesV2` | feature presence lists + digest (`esv/k/r/total/digest` — SHA-384-ish) |
+| `JSRequestSample` / `JSLoadTiming` | resource/navigation API samples; full SDK load-timing waterfall (`beaconStatus: 200`) |
+| `JSDeviceIdPersistence` | localStorage/indexedDB/cache/opfs/webSQL persistence signature + `signature`/`firstSeen` |
+| `JSVideo` | autoplay policy, decode results, `rvfc` support |
+| `JSSDK` | `cUserID` / `cSessionID` |
+
+⚠️ = bot/automation tells (`webdriver`, Playwright/Selenium probes, debugger attach, CDP detection) — exactly what a client-side actor can rewrite before encryption, since there is no client-side lie/anomaly flag.
+
 ## Repo layout & quick run
 
 ```

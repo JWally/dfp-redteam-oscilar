@@ -262,5 +262,12 @@ if (clean && tampered){
 }
 
 await step('dim','———— done · close the window to exit —————');
+mkdirSync(join(repoRoot,'screenshots'),{recursive:true});
+// expand the inner scroll pane so fullPage captures EVERY row of the payload
+await page.evaluate(()=>{ const el=document.querySelector('#out div[style*="max-height"]'); if (el) el.style.maxHeight='none'; });
+await sleep(800);
+await page.screenshot({ path: join(repoRoot,'screenshots','oscillar-full-payload.png'), fullPage:true });
+await page.screenshot({ path: join(repoRoot,'screenshots','oscillar-view.png') });
+console.log('[+] screenshots saved: screenshots/oscillar-full-payload.png, oscillar-view.png');
 browser.on('disconnected', ()=> process.exit(0));
 await new Promise(()=>{});
