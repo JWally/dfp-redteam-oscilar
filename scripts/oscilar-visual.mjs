@@ -172,32 +172,45 @@ if (keyInfo && keyInfo.ok){
   await L('dim')('    counter/nonce = '+keyInfo.nonce);
 } else { await L('bad')('[!] chacha recovery failed — bundle/cipher mismatch'); }
 
-// render payload
+// render payload — FULLY expanded (every module, field, nested value, list item)
 if (clean){
-  await step('acc','[*] rendering readable payload …');
+  await step('acc','[*] rendering FULL readable payload (all modules + all values) …');
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const TELLS = ['webdriver','isBrave','playwright','selenium','incognito','debuggerActive','cdpDetected','error'];
-  const fmt = v => {
-    if (v === null || v === undefined) return '<span class="dim">—</span>';
-    if (typeof v === 'boolean') return String(v);
-    if (Array.isArray(v)) return '<span class="dim">list['+v.length+']</span>'+(v.length?(' '+esc(JSON.stringify(v[0]).slice(0,80))):'');
-    if (typeof v === 'object') return '<span class="dim">obj{'+esc(Object.keys(v).slice(0,6).join(','))+'}…</span>';
-    if (typeof v === 'string' && v.length>90) return esc(v.slice(0,90))+'…';
-    return esc(String(v));
-  };
-  let rows = '';
-  for (const [mod, body] of Object.entries(clean)) {
-    if (typeof body !== 'object' || body === null) { rows += `<tr><td class="k">${esc(mod)}</td><td class="dim">·</td><td>${fmt(body)}</td></tr>`; continue; }
-    if (Array.isArray(body)) { rows += `<tr><td class="k">${esc(mod)}</td><td class="dim">·</td><td>${fmt(body)}</td></tr>`; continue; }
-    for (const [k,v] of Object.entries(body)) {
-      const tell = TELLS.some(t=>k.toLowerCase().includes(t));
-      rows += `<tr${tell?' class="tell"':''}><td class="k">${esc(mod)}.${esc(k)}</td><td class="dim">${Array.isArray(v)?v.length:(typeof v==='object'&&v?Object.keys(v).length:typeof v)}</td><td>${fmt(v)}</td></tr>`;
+  const TELLS = ['webdriver','isBrave','playwright','selenium','incognito','debuggerActive','cdpDetected','error','lie'];
+  const rows = [];
+  const push = (path, type, val, tell) => rows.push(`<tr${tell?' class="tell"':''}><td class="k">${esc(path)}</td><td class="dim">${esc(type)}</td><td>${val}</td></tr>`);
+  const isObj = v => v !== null && typeof v === 'object';
+  const prim = v => !isObj(v);
+  function flatten(path, v) {
+    const tell = TELLS.some(t => path.toLowerCase().includes(t));
+    if (prim(v)) {
+      let disp, title = '';
+      if (typeof v === 'string') { disp = esc(v.slice(0,300)) + (v.length>300?'…':''); title = v; }
+      else disp = esc(String(v));
+      push(path, typeof v, title ? `<span title="${esc(title)}">${disp}</span>` : disp, tell);
+      return;
     }
+    if (Array.isArray(v)) {
+      if (v.length === 0) { push(path, 'list[0]', '<span class="dim">(empty)</span>', tell); return; }
+      if (v.every(isObj)) {
+        push(path, `list[${v.length}]`, `<span class="dim">${v.length} object(s)</span>`, tell);
+        v.forEach((item, i) => flatten(`${path}[${i}]`, item));
+      } else {
+        const all = v.map(x => typeof x === 'string' ? `"${x}"` : String(x)).join(', ');
+        const disp = all.length > 600 ? all.slice(0,600) + '…' : all;
+        push(path, `list[${v.length}]`, `<span title="${esc(all)}">${esc(disp)}</span>`, tell);
+      }
+      return;
+    }
+    // object
+    for (const [k, sub] of Object.entries(v)) flatten(`${path}.${k}`, sub);
   }
-  await page.evaluate(([r,k])=>window.__render('out',
-    '<h2>READABLE PAYLOAD — captured pre-encryption from the SDK\'s own object</h2>'+
-    '<table><tr><th>module.field</th><th>type</th><th>value</th></tr>'+r+'</table>'+
-    '<div class="big"><b>ChaCha20 key:</b> '+k+'</div>'), [rows, keyInfo?keyInfo.key:'n/a']);
+  for (const [mod, body] of Object.entries(clean)) flatten(mod, body);
+  const table = '<table><tr><th>path</th><th>type</th><th>value</th></tr>' + rows.join('') + '</table>';
+  await page.evaluate(([t,k])=>window.__render('out',
+    '<h2>FULL READABLE PAYLOAD — '+k.modules+' modules · '+k.rows+' rows (captured pre-encryption from the SDK\'s own object)</h2>'+
+    '<div style="max-height:62vh;overflow:auto;border:1px solid #30363d;border-radius:8px">'+t+'</div>'+
+    '<div class="big"><b>ChaCha20 key:</b> '+k.key+'</div>'), [table, {modules:Object.keys(clean).length, rows: rows.length, key: keyInfo?keyInfo.key:'n/a'}]);
   mkdirSync('/tmp/opencode/osc',{recursive:true});
   writeFileSync('/tmp/opencode/osc/visual-A-clean.json', JSON.stringify(clean,null,2));
 }
