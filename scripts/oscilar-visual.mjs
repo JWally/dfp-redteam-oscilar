@@ -215,20 +215,23 @@ if (clean){
   writeFileSync('/tmp/opencode/osc/visual-A-clean.json', JSON.stringify(clean,null,2));
 }
 
-// ---- phase 2: tamper -------------------------------------------------------
-await step('bad','[*] PHASE 2: reloading with client-side payload tamper (screen 2560x1440, UA→Win32 Chrome, webdriver→false)');
-await page.unroute('**/index.min.js*');
-await page.route('**/index.min.js*', r=>r.fulfill({ status:200, contentType:'application/javascript', body: tamperSrc }));
-await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil:'load' });
-await page.mouse.move(320,320); await page.mouse.click(320,320);
-await page.waitForFunction(()=>window.__oscWasm && window.__oscWasm.some(c=>c.encB64 && c.encB64.length>100), { timeout:60000 }).catch(()=>{});
+// ---- phase 2: tamper (in a SECOND tab so the full payload stays on page) ----
+await step('bad','[*] PHASE 2: opening a second tab with the client-side payload tamper (screen 2560x1440, UA→Win32 Chrome, webdriver→false)');
+const page2 = await ctx.newPage();
+await page2.route('**/index.min.js*', r=>r.fulfill({ status:200, contentType:'application/javascript', body: tamperSrc }));
+await page2.route('**/telemetry', r=>r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ beaconIDs: [] }) }));
+await page2.route('**/error', r=>r.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+await page2.goto(`http://127.0.0.1:${PORT}/`, { waitUntil:'load' });
+await page2.mouse.move(320,320); await page2.mouse.click(320,320);
+await page2.waitForFunction(()=>window.__oscWasm && window.__oscWasm.some(c=>c.encB64 && c.encB64.length>100), { timeout:60000 }).catch(()=>{});
 await sleep(4000);
-const cap2 = await page.evaluate(()=>window.__oscWasm||[]).catch(()=>[]);
+const cap2 = await page2.evaluate(()=>window.__oscWasm||[]).catch(()=>[]);
 const good2 = cap2.filter(c=>c.encB64 && c.encB64.length>100 && c.A && c.A.startsWith('{'));
 tampered = good2.length ? JSON.parse(good2[good2.length-1].A) : null;
-await L('ok')('[+] tampered payload captured ('+(tampered?Object.keys(tampered).length:0)+' modules), re-encrypted, POST intercepted');
+await page2.close();
+await L('ok')('[+] tampered payload captured in 2nd tab ('+(tampered?Object.keys(tampered).length:0)+' modules), re-encrypted, POST intercepted');
 
-// render tamper diff
+// render tamper diff (appended BELOW the full payload, which is still on page)
 if (clean && tampered){
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fields = [['JSScreen','width'],['JSScreen','height'],['JSScreen','screenWidth'],['JSScreen','screenHeight'],
