@@ -1,0 +1,15 @@
+{
+  "name": "dfp-redteam-oscillar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Oscilar (zqp) device-intelligence SDK client-side drill-down (authorized, own-stack, 2026-10-25)",
+  "scripts": {
+    "visual": "node scripts/oscilar-visual.mjs",
+    "chacha": "node scripts/oscilar-chacha-poc.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1",
+    "msgpackr": "^1"
+  }
+}

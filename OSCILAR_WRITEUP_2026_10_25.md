@@ -538,6 +538,52 @@ Questions I’d actually ask in the room:
 
 ---
 
+## 13b. ✅ Live visual demo + readable payload (2026-10-25)
+
+A headed-browser demo (`oscilar-visual.mjs` in the repo) runs the real sandbox
+loader and, at the encrypt call site (`Q["encode"](A)` → `g(bytes, key)`),
+injects a **read-only capture of the SDK's own payload object `A`** — so the
+full readable payload is recovered live, before encryption.
+
+**What the live run shows (48 modules):**
+
+```
+JSTime         timezone=300 · timezoneString=America/Chicago · timeOnPage=10094
+JSScreen       width=1280 · height=720 · colorDepth=24 · dpr=1
+JSUserAgent    UA=Mozilla/5.0 (X11; Linux x86_64) …HeadlessChrome… · webdriver=true
+               uaData{ platform=Linux · bitness=64 · wow64=false } · isBrave=false
+JSFonts        numChecked=419
+JSCanvasHash   stringHash=28c87a97 · dataURLSubstr=c1a9ffc8
+JSEmoji        15 emoji hashes (meltingFace=eb8908e8, fox=a7c5972e, …)
+JSMathFingerprint  mathHash=2104791054 · wasmVsJs engine=v8
+JSWebGL        error="WebGL not supported" (headless)
+JSAudio        error="Audio not supported" (headless)
+JSIncognito    serviceWorker=true · opfsIncognitoDetected=true
+JSPlaywright / JSSeleniumProperties / JSRuntimeDomain  (bot-detection modules)
+JSLoadTiming   navType=navigate · beaconStatus=200
+transactionID/tabID/sessionID/deviceID/version=8.2.2
+```
+
+**Live ChaCha20 key recovery** (same run, plaintext `enc` XOR ciphertext `out`):
+
+```
+state[0:16] = "expand 32-byte k" ✓
+KEY = 7f000000 7f000000 7f000000 ff000000 fe000000 7f000000 ff000000 ff000000
+nonce/counter = 00000000000000007f0000007f000000
+```
+
+**Live tamper phase:** reload with `A` mutated client-side (screen 2560×1440,
+UA→Win32 Chrome, `webdriver→false`, `timeString=TAMPERED-TIME`); the SDK
+re-encrypts and ships the tampered object with no lie flag. The on-page oracle
+panel shows the earlier clean-vs-tampered sandbox differential — both 200 / 5
+beaconIDs / **same `d`** (device identity, not a risk verdict).
+
+**Artifacts:** `/tmp/opencode/osc/visual-A-clean.json`,
+`/tmp/opencode/osc/visual-A-tampered.json`, and the instrumented bundle in the
+repo at `assets/osc-index-wrapped.js`.
+
+Run: `node scripts/oscilar-visual.mjs` (close the browser window to exit).
+
 ## 14. Limitations / next steps
 
 - Public assets only; no customer origin was touched. Telemetry was fulfilled
@@ -568,6 +614,8 @@ Questions I’d actually ask in the room:
 | `bots/oscilar-tamper.mjs` | Pre-encryption payload tamper; `--sniff`, `--tamper`, `--live` |
 | `bots/oscilar-oracle.mjs` | Clean vs tampered sandbox differential |
 | `bots/oscilar-oracle-persistent.mjs` | Same-context clean/clean/tamper `d` stability test |
+| `bots/oscilar-visual.mjs` (repo `scripts/`) | HEADED demo: live readable payload + ChaCha key + tamper diff |
+| `assets/osc-index-wrapped.js` (repo) | Instrumented public SDK bundle (capture hooks) |
 | `bots/oscilar-lie.mjs` | Safari/Windows UA lie profiles; payload lie-field check |
 | `bots/oscilar-chacha-poc.mjs` | Recovers key/nonce from one beacon |
 | `/tmp/opencode/osc/` | WASM, memory dumps, telemetry JSON, string/args dumps |
